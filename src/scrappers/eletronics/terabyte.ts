@@ -1,0 +1,62 @@
+import { ElementHandle, Page } from 'puppeteer';
+import { formatReturnPrice } from 'src/utils';
+
+async function getProductInfo(product: ElementHandle<Element>, results: any) {
+  try {
+    const purchaseLink = await product.$(
+      '.commerce_columns_item_image.text-center > a',
+    );
+    const link = await purchaseLink.evaluate((n) => n.getAttribute('href'));
+
+    const productImage = await product.$(
+      '.commerce_columns_item_image.text-center > a > img',
+    );
+    const image = await productImage.evaluate((n) => n.getAttribute('src'));
+
+    const productName = await product.$(
+      '.commerce_columns_item_caption > a > h2 > strong',
+    );
+    const name = await productName.evaluate((n) => n.innerHTML);
+
+    const productPrice = await product.$('.prod-new-price > span');
+    const price = await productPrice.evaluate((p) => p.innerHTML);
+
+    results.push({
+      image,
+      name,
+      currency: 'BRL',
+      price: formatReturnPrice(price),
+      purchaseLink: link,
+      store: 'terabyte',
+    });
+  } catch (err) {
+    // console.log(err)
+  }
+}
+
+export async function searchTerabyte(
+  page: Page,
+  query: string,
+  results: any[],
+) {
+  await page
+  .goto(`https://www.terabyteshop.com.br/busca?str=${query}`, {
+    timeout: 0,
+    waitUntil: 'domcontentloaded',
+  })
+  .then(async () => {
+    try {
+      await page.waitForXPath('//*[@id="prodarea"]/div', {
+        timeout: 4000,
+      });
+      const productElements = await page.$x('//*[@id="prodarea"]/div');
+      await Promise.all(
+        productElements.map((product) => getProductInfo(product, results)),
+      );
+    } catch (err) {}
+    finally {
+      await page.close()
+    }
+  })
+  .catch(() => null);
+}
